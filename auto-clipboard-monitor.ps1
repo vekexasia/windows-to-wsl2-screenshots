@@ -7,8 +7,8 @@ param(
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# Convert the tilde path to WSL format
-if ($SaveDirectory -eq "/tmp") {
+# Convert Unix-style paths to WSL UNC format
+if ($SaveDirectory -match "^/") {
     # Try to auto-detect WSL distribution if auto mode is used
     if ($WslDistro -eq "auto") {
         $WslDistros = @(wsl.exe -l -q | Where-Object { 
@@ -19,13 +19,20 @@ if ($SaveDirectory -eq "/tmp") {
         if ($WslDistros.Count -gt 0) {
             $WslDistro = $WslDistros[0]
             Write-Host "Auto-detected WSL distribution: $WslDistro"
+        } else {
+            Write-Error "No WSL distribution found. Please install WSL or specify -WslDistro parameter."
+            exit 1
         }
     }
-    
-    # Get the actual WSL username instead of Windows username
-    $WslUsername = wsl.exe -d $WslDistro -e whoami
-    $WslUsername = $WslUsername.Trim()
-    $SaveDirectory = "\\wsl.localhost\$WslDistro\home\$WslUsername\.screenshots"
+
+    # Convert Unix path to UNC path (remove leading slash, replace / with \)
+    $UnixPath = $SaveDirectory.TrimStart('/')
+    $SaveDirectory = "\\wsl.localhost\$WslDistro\$UnixPath"
+
+    if (!(Test-Path "\\wsl.localhost\$WslDistro")) {
+        Write-Error "Cannot access WSL distribution '$WslDistro'. Make sure WSL is running."
+        exit 1
+    }
 }
 
 if (!(Test-Path $SaveDirectory)) {

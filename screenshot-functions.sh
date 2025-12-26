@@ -10,8 +10,6 @@ start-screenshot-monitor() {
     # Kill any existing monitors
     pkill -f "auto-clipboard-monitor" 2>/dev/null || true
     
-    # Create screenshots directory in home
-    mkdir -p "/tmp"
     
     # Get current directory to find the PowerShell script
     local script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
