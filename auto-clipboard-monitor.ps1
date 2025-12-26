@@ -1,6 +1,6 @@
 # True automatic clipboard monitor using Windows events
 param(
-    [string]$SaveDirectory = "~/.screenshots",
+    [string]$SaveDirectory = "/tmp",
     [string]$WslDistro = "auto"
 )
 
@@ -8,7 +8,7 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 # Convert the tilde path to WSL format
-if ($SaveDirectory -eq "~/.screenshots") {
+if ($SaveDirectory -eq "/tmp") {
     # Try to auto-detect WSL distribution if auto mode is used
     if ($WslDistro -eq "auto") {
         $WslDistros = @(wsl.exe -l -q | Where-Object { 

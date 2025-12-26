@@ -11,7 +11,7 @@ start-screenshot-monitor() {
     pkill -f "auto-clipboard-monitor" 2>/dev/null || true
     
     # Create screenshots directory in home
-    mkdir -p "$HOME/.screenshots"
+    mkdir -p "/tmp"
     
     # Get current directory to find the PowerShell script
     local script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
@@ -24,19 +24,19 @@ start-screenshot-monitor() {
     fi
     
     # Start the monitor in background
-    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script" > "$HOME/.screenshots/monitor.log" 2>&1 &
+    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script" > "/tmp/monitor.log" 2>&1 &
     
     echo "✅ SCREENSHOT AUTOMATION IS NOW RUNNING!"
     echo ""
     echo "🔥 MAGIC WORKFLOW:"
     echo "   1. Take screenshot (Win+Shift+S, Win+PrintScreen, etc.)"
-    echo "   2. Image automatically saved to $HOME/.screenshots/"
+    echo "   2. Image automatically saved to /tmp/"
     echo "   3. Path automatically copied to both Windows & WSL2 clipboards!"
     echo "   4. Just Ctrl+V in Claude Code or any application!"
     echo ""
-    echo "📁 Images save to: $HOME/.screenshots/"
-    echo "🔗 Latest always at: $HOME/.screenshots/latest.png"
-    echo "📋 Drag & drop images to $HOME/.screenshots/ also works!"
+    echo "📁 Images save to: /tmp/"
+    echo "🔗 Latest always at: /tmp/latest.png"
+    echo "📋 Drag & drop images to /tmp/ also works!"
 }
 
 # Stop the monitor
@@ -51,7 +51,7 @@ check-screenshot-monitor() {
     if pgrep -f "auto-clipboard-monitor" > /dev/null 2>&1; then
         echo "✅ Screenshot automation is running"
         echo "🔥 Just take screenshots - everything is automatic!"
-        echo "📁 Saves to: $HOME/.screenshots/"
+        echo "📁 Saves to: /tmp/"
         echo "📋 Paths automatically copied to clipboard for easy pasting!"
     else
         echo "❌ Screenshot automation not running"
@@ -61,14 +61,14 @@ check-screenshot-monitor() {
 
 # Quick access to latest image path
 latest-screenshot() {
-    echo "$HOME/.screenshots/latest.png"
+    echo "/tmp/latest.png"
 }
 
 # Copy latest image path to clipboard
 copy-latest-screenshot() {
-    if [ -f "$HOME/.screenshots/latest.png" ]; then
-        echo "$HOME/.screenshots/latest.png" | clip.exe
-        echo "✅ Copied to clipboard: $HOME/.screenshots/latest.png"
+    if [ -f "/tmp/latest.png" ]; then
+        echo "/tmp/latest.png" | clip.exe
+        echo "✅ Copied to clipboard: /tmp/latest.png"
     else
         echo "❌ No latest screenshot found"
         echo "💡 Take a screenshot first (Win+Shift+S)"
@@ -78,8 +78,8 @@ copy-latest-screenshot() {
 # Copy specific image path to clipboard
 copy-screenshot() {
     if [ -n "$1" ]; then
-        local path="$HOME/.screenshots/$1"
-        if [ -f "$HOME/.screenshots/$1" ]; then
+        local path="/tmp/$1"
+        if [ -f "/tmp/$1" ]; then
             echo "$path" | clip.exe
             echo "✅ Copied to clipboard: $path"
         else
@@ -96,7 +96,7 @@ copy-screenshot() {
 # List available screenshots
 list-screenshots() {
     echo "📸 Available screenshots:"
-    if ls "$HOME/.screenshots/"*.png 2>/dev/null | grep -v latest; then
+    if ls "/tmp/"*.png 2>/dev/null | grep -v latest; then
         echo ""
         echo "💡 Use 'copy-screenshot <filename>' to copy path to clipboard"
     else
@@ -108,12 +108,12 @@ list-screenshots() {
 # Open screenshots directory
 open-screenshots() {
     if command -v explorer.exe > /dev/null; then
-        explorer.exe "$(wslpath -w "$HOME/.screenshots")"
+        explorer.exe "$(wslpath -w "/tmp")"
     elif command -v nautilus > /dev/null; then
-        nautilus "$HOME/.screenshots"
+        nautilus "/tmp"
     else
-        echo "📁 Screenshots directory: $HOME/.screenshots/"
-        ls -la "$HOME/.screenshots/"
+        echo "📁 Screenshots directory: /tmp/"
+        ls -la "/tmp/"
     fi
 }
 
@@ -122,7 +122,7 @@ clean-screenshots() {
     local keep=${1:-10}
     echo "🧹 Cleaning old screenshots, keeping latest $keep files..."
     
-    cd "$HOME/.screenshots" || return 1
+    cd "/tmp" || return 1
     
     # Count files (excluding latest.png)
     local count=$(ls -1 screenshot_*.png 2>/dev/null | wc -l)
