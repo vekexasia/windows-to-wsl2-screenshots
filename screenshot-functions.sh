@@ -22,9 +22,12 @@ start-screenshot-monitor() {
         echo "💡 Make sure auto-clipboard-monitor.ps1 is in the same directory as this script"
         return 1
     fi
-    
+
+    # Convert WSL path to Windows path for PowerShell
+    local ps_script_win="$(wslpath -w "$ps_script")"
+
     # Start the monitor in background
-    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script" > "/tmp/monitor.log" 2>&1 &
+    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script_win" > "/tmp/monitor.log" 2>&1 &
     
     echo "✅ SCREENSHOT AUTOMATION IS NOW RUNNING!"
     echo ""
