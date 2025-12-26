@@ -42,27 +42,6 @@ Write-Host "Monitoring clipboard events and directory changes..."
 $previousHash = $null
 $lastFileTime = Get-Date
 
-# Function to copy path to both clipboards
-function Set-BothClipboards($path) {
-    try {
-        [System.Windows.Forms.Clipboard]::SetText($path)
-        $wslCommand = "echo '$path' | clip.exe"
-        wsl.exe -d $WslDistro -e bash -c $wslCommand
-        return $true
-    } catch {
-        Start-Sleep -Milliseconds 200
-        try {
-            [System.Windows.Forms.Clipboard]::SetText($path)
-            $wslCommand = "echo '$path' | clip.exe" 
-            wsl.exe -d $WslDistro -e bash -c $wslCommand
-            return $true
-        } catch {
-            Write-Warning "Could not set clipboard: $_"
-            return $false
-        }
-    }
-}
-
 while ($true) {
     try {
         Start-Sleep -Milliseconds 500
@@ -77,26 +56,9 @@ while ($true) {
                 $currentHash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash($imageBytes))
                 
                 if ($currentHash -ne $previousHash) {
-                    Write-Host "New image detected in clipboard"
-                    
-                    $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-                    $filename = "screenshot_$timestamp.png"
-                    $filepath = Join-Path $SaveDirectory $filename
-                    $image.Save($filepath, [System.Drawing.Imaging.ImageFormat]::Png)
-                    
                     $latestPath = Join-Path $SaveDirectory "latest.png"
-                    if (Test-Path $latestPath) { Remove-Item $latestPath -Force }
-                    Copy-Item $filepath $latestPath -Force
-                    
-                    # Create full path for WSL2 instead of using tilde
-                    $wslPath = "/home/$WslUsername/.screenshots/$filename"
-                    Start-Sleep -Milliseconds 1000
-                    
-                    if (Set-BothClipboards $wslPath) {
-                        Write-Host "AUTO-SAVED: $filename"
-                        Write-Host "Path ready for Ctrl+V: $wslPath"
-                    }
-                    
+                    $image.Save($latestPath, [System.Drawing.Imaging.ImageFormat]::Png)
+                    Write-Host "AUTO-SAVED: latest.png"
                     $previousHash = $currentHash
                 }
                 $image.Dispose()
@@ -110,16 +72,9 @@ while ($true) {
         }
         
         if ($newFiles) {
-            foreach ($file in $newFiles) {
-                # Create full path for WSL2 instead of using tilde
-                $wslPath = "/home/$WslUsername/.screenshots/$($file.Name)"
-                Copy-Item $file.FullName (Join-Path $SaveDirectory "latest.png") -Force
-                
-                if (Set-BothClipboards $wslPath) {
-                    Write-Host "NEW FILE DETECTED: $($file.Name)"
-                    Write-Host "Path ready for Ctrl+V: $wslPath"
-                }
-            }
+            $latestFile = $newFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            Copy-Item $latestFile.FullName (Join-Path $SaveDirectory "latest.png") -Force
+            Write-Host "NEW FILE DETECTED - copied to latest.png"
             $lastFileTime = $currentTime
         }
         
