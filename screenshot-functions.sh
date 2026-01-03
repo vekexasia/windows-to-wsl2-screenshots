@@ -6,15 +6,16 @@
 # Start the auto-screenshot monitor
 start-screenshot-monitor() {
     echo "🚀 Starting Windows-to-WSL2 screenshot automation..."
-    
+
+    local pid_file="/tmp/screenshot-monitor.pid"
+
     # Kill any existing monitors
-    pkill -f "auto-clipboard-monitor" 2>/dev/null || true
-    
-    
+    stop-screenshot-monitor 2>/dev/null || true
+
     # Get current directory to find the PowerShell script
     local script_dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
     local ps_script="$script_dir/auto-clipboard-monitor.ps1"
-    
+
     if [ ! -f "$ps_script" ]; then
         echo "❌ PowerShell script not found at: $ps_script"
         echo "💡 Make sure auto-clipboard-monitor.ps1 is in the same directory as this script"
@@ -24,16 +25,29 @@ start-screenshot-monitor() {
     # Convert WSL path to Windows path for PowerShell
     local ps_script_win="$(wslpath -w "$ps_script")"
 
-    # Start the monitor in background
-    nohup powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script_win" > "/tmp/monitor.log" 2>&1 &
-    
-    echo "✅ SCREENSHOT AUTOMATION IS NOW RUNNING!"
+    # Start the monitor using cmd.exe start /min (no visible window)
+    cmd.exe /c start /min powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "$ps_script_win" 2>/dev/null &
+
+    # Give it a moment to start
+    sleep 1
+
+    # Find the PID by matching the command line (using WMI for reliable CommandLine access)
+    local pid
+    pid=$(powershell.exe -Command "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { \$_.CommandLine -like '*auto-clipboard-monitor*' } | Select-Object -First 1 -ExpandProperty ProcessId" 2>/dev/null | tr -d '\r\n')
+
+    if [ -n "$pid" ] && [ "$pid" -gt 0 ] 2>/dev/null; then
+        echo "$pid" > "$pid_file"
+        echo "✅ SCREENSHOT AUTOMATION IS NOW RUNNING! (PID: $pid)"
+    else
+        echo "❌ Failed to start screenshot monitor"
+        return 1
+    fi
     echo ""
     echo "🔥 MAGIC WORKFLOW:"
     echo "   1. Take screenshot (Win+Shift+S, Win+PrintScreen, etc.)"
     echo "   2. Image automatically saved to /tmp/"
     echo "   3. Path automatically copied to both Windows & WSL2 clipboards!"
-    echo "   4. Just Ctrl+V in Claude Code or any application!"
+    echo "   4. Just Ctrl+Alt+S and Ctrl+Shift+V in Claude Code or any application!"
     echo ""
     echo "📁 Images save to: /tmp/"
     echo "🔗 Latest always at: /tmp/latest.png"
@@ -43,21 +57,51 @@ start-screenshot-monitor() {
 # Stop the monitor
 stop-screenshot-monitor() {
     echo "🛑 Stopping screenshot automation..."
-    pkill -f "auto-clipboard-monitor" 2>/dev/null || true
+
+    local pid_file="/tmp/screenshot-monitor.pid"
+    local stopped=false
+
+    # Try to stop using saved PID first
+    if [ -f "$pid_file" ]; then
+        local pid
+        pid=$(cat "$pid_file" | tr -d '\r\n')
+        if [ -n "$pid" ]; then
+            taskkill.exe /PID "$pid" /F >/dev/null 2>&1 && stopped=true
+            rm -f "$pid_file"
+        fi
+    fi
+
+    # Fallback: kill by process name matching (using WMI for reliable CommandLine access)
+    if [ "$stopped" = false ]; then
+        powershell.exe -Command "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { \$_.CommandLine -like '*auto-clipboard-monitor*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }" 2>/dev/null
+    fi
+
     echo "✅ Screenshot automation stopped"
 }
 
 # Check if running
 check-screenshot-monitor() {
-    if pgrep -f "auto-clipboard-monitor" > /dev/null 2>&1; then
-        echo "✅ Screenshot automation is running"
-        echo "🔥 Just take screenshots - everything is automatic!"
-        echo "📁 Saves to: /tmp/"
-        echo "📋 Paths automatically copied to clipboard for easy pasting!"
-    else
-        echo "❌ Screenshot automation not running"
-        echo "💡 Start with: start-screenshot-monitor"
+    local pid_file="/tmp/screenshot-monitor.pid"
+
+    if [ -f "$pid_file" ]; then
+        local pid
+        pid=$(cat "$pid_file" | tr -d '\r\n')
+        # Check if process is still running using tasklist
+        if tasklist.exe /FI "PID eq $pid" 2>/dev/null | grep -q "$pid"; then
+            echo "✅ Screenshot automation is running (PID: $pid)"
+            echo "🔥 Just take screenshots - everything is automatic!"
+            echo "📁 Saves to: /tmp/"
+            echo "📋 Paths automatically copied to clipboard for easy pasting!"
+            return 0
+        else
+            # PID file exists but process is dead - clean up
+            rm -f "$pid_file"
+        fi
     fi
+
+    echo "❌ Screenshot automation not running"
+    echo "💡 Start with: start-screenshot-monitor"
+    return 1
 }
 
 # Quick access to latest image path
